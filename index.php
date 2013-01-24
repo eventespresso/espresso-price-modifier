@@ -55,7 +55,7 @@ add_action('action_hook_espresso_new_question_price_mod_tr', 'espresso_new_quest
 
 
 function espresso_parse_admin_question_response_for_price( $value = '', $price_mod = 'N' ) {
-	echo $value;
+	//echo $value;
 	if ( $price_mod == 'Y' ) {
 		global $org_options;
 		$values = explode( '|', $value );
