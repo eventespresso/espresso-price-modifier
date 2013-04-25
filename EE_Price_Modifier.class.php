@@ -198,8 +198,8 @@ class EE_Price_Modifier {
 	*	@param 	string		$price_mod
 	*	@return 		array
 	*/	
-	private function _process_price_mod_values( string $price_mod = NULL ) {
-		if ( empty( $price_mod )) {
+	private function _process_price_mod_values( $price_mod = FALSE ) {
+		if ( ! $price_mod ) {
 			return FALSE;
 		}
 		$values = explode( '|', $price_mod );
