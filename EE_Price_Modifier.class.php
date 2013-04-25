@@ -356,7 +356,7 @@ class EE_Price_Modifier {
 					$value = $mod . '&nbsp;[&nbsp;' . $plus_or_minus . $org_options['currency_symbol'] . number_format( (float)$price_mod, 2, '.', ',' ) . '&nbsp;]';				
 
 					$SQL = 'UPDATE '. EVENTS_ATTENDEE_TABLE .' SET final_price = final_price ' . $plus_or_minus . ' %f where id = %d';	
-					if ( ! $wpdb->query( $wpdb->prepare( $SQL, $price, $attendee_id ))) {
+					if ( ! $wpdb->query( $wpdb->prepare( $SQL, $price_mod, $attendee_id ))) {
 						$success = FALSE;
 					}
 					//echo '<h4>LQ : ' . $wpdb->last_query . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';		
