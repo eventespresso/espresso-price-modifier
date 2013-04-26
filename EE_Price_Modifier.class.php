@@ -27,7 +27,8 @@
 
  */
 register_activation_hook( __FILE__, array( 'EE_Price_Modifier', 'activate_price_modifier' ));
-add_action( 'plugins_loaded', array( 'EE_Price_Modifier', 'instance' ));		
+add_action( 'activated_plugin', array( 'EE_Price_Modifier', 'price_mod_plugin_activation_errors' ));
+add_action( 'plugins_loaded', array( 'EE_Price_Modifier', 'instance' ), 20 );		
 /**
  * ------------------------------------------------------------------------
  *
@@ -573,37 +574,55 @@ class EE_Price_Modifier {
 	*		@return 		void
 	*/	
 	public function activate_price_modifier() {
-	
-		if ( file_exists( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' )) {
-			require_once( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' );		
-			$sql = "id int(11) unsigned NOT NULL auto_increment,
-					sequence INT(11) NOT NULL default '0',
-					question_type enum('TEXT','TEXTAREA','MULTIPLE','SINGLE','DROPDOWN') NOT NULL default 'TEXT',
-					question text NOT NULL,
-					system_name varchar(15) DEFAULT NULL,
-					response text NULL,
-					required ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
-					required_text text NULL,
-					price_mod ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
-					price_mod_qty text NULL,
-					price_mod_sold text NULL,
-					price_mod_total SMALLINT(6) NOT NULL DEFAULT '0',
-					admin_only ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
-					wp_user int(22) DEFAULT '1',
-					PRIMARY KEY  (id),
-					KEY wp_user (wp_user),
-					KEY system_name (system_name),
-					KEY admin_only (admin_only)";
-			event_espresso_run_install( 'events_question', EVENT_ESPRESSO_VERSION, $sql );
-		}
+
+		global $wpdb;
+		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+		$wp_table_name = $wpdb->prefix . 'events_question';
+
+		$SQL = "CREATE TABLE $wp_table_name ( 	
+			id int(11) unsigned NOT NULL auto_increment,
+			sequence INT(11) NOT NULL default '0',
+			question_type enum('TEXT','TEXTAREA','MULTIPLE','SINGLE','DROPDOWN') NOT NULL default 'TEXT',
+			question text NOT NULL,
+			system_name varchar(15) DEFAULT NULL,
+			response text NULL,
+			required ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
+			required_text text NULL,
+			price_mod ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
+			price_mod_qty text NULL,
+			price_mod_sold text NULL,
+			price_mod_total SMALLINT(6) NOT NULL DEFAULT '0',
+			admin_only ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
+			wp_user int(22) DEFAULT '1',
+			PRIMARY KEY  (id),
+			KEY wp_user (wp_user),
+			KEY system_name (system_name),
+			KEY admin_only (admin_only)
+		 	) DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;";			
+			dbDelta( $SQL );
 
 	}
 
+
+
+
+
+	/**
+	 * 		captures plugin activation errors for debugging
+	 *
+	 * 		@access public
+	 * 		@return void
+	 */
+	function price_mod_plugin_activation_errors() {
+		if ( WP_DEBUG === TRUE ) {
+			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_plugin_activation_errors.html', ob_get_contents() );
+		}	
+	}
+	
+	
+	
+	
 }
-
-
-
-	// modified files in 3.1 core :
-	// includes/admin-files/form-builder/questions/new_question.php
-	// includes/form-builder/questions/edit_question.php
-
+// modified files in 3.1 core :
+// includes/admin-files/form-builder/questions/new_question.php
+// includes/form-builder/questions/edit_question.php
