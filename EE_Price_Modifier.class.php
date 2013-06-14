@@ -599,12 +599,9 @@ class EE_Price_Modifier {
 	*		@return 		void
 	*/	
 	public function activate_price_modifier() {
-
-		global $wpdb;
-		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-		$wp_table_name = $wpdb->prefix . 'events_question';
-
-		$SQL = "CREATE TABLE $wp_table_name ( 	
+		$table_name = 'events_question';
+		
+		$SQL = "
 			id int(11) unsigned NOT NULL auto_increment,
 			sequence INT(11) NOT NULL default '0',
 			question_type enum('TEXT','TEXTAREA','MULTIPLE','SINGLE','DROPDOWN') NOT NULL default 'TEXT',
@@ -622,10 +619,12 @@ class EE_Price_Modifier {
 			PRIMARY KEY  (id),
 			KEY wp_user (wp_user),
 			KEY system_name (system_name),
-			KEY admin_only (admin_only)
-		 	) DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;";			
-			dbDelta( $SQL );
-
+			KEY admin_only (admin_only)";			
+			
+			if ( ! function_exists( 'event_espresso_run_install' )) {
+				require_once( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' ); 		
+			}
+			event_espresso_run_install($table_name, self::version(), $SQL);
 	}
 
 
@@ -640,7 +639,7 @@ class EE_Price_Modifier {
 	 */
 	function price_mod_plugin_activation_errors() {
 		if ( WP_DEBUG === TRUE ) {
-			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_plugin_activation_errors.html', ob_get_contents() );
+			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_price_modifier_plugin_activation_errors.html', ob_get_contents() );
 		}	
 	}
 	
