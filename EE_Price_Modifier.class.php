@@ -550,7 +550,7 @@ class EE_Price_Modifier {
 					KEY wp_user (wp_user),
 					KEY system_name (system_name),
 					KEY admin_only (admin_only)";
-			event_espresso_run_install( 'events_question', EVENT_ESPRESSO_VERSION, $sql );
+			event_espresso_run_install( 'events_question', self::$_version, $sql );
 		}
 
 	}
@@ -559,7 +559,6 @@ class EE_Price_Modifier {
 
 
 
-	// modified files in 3.1 core :
-	// includes/admin-files/form-builder/questions/new_question.php
-	// includes/form-builder/questions/edit_question.php
-
+// modified files in 3.1 core :
+// includes/admin-files/form-builder/questions/new_question.php
+// includes/form-builder/questions/edit_question.php
