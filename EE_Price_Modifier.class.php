@@ -621,6 +621,7 @@ class EE_Price_Modifier {
 					KEY system_name (system_name),
 					KEY admin_only (admin_only)";
 			event_espresso_run_install( 'events_question', self::$_version, $sql );
+		}
 	}
 
 
