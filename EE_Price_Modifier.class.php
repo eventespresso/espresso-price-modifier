@@ -4,7 +4,7 @@
   Plugin URI: http://eventespresso.com/
   Description: Modify the event fees that are charged by adding price modifiers to form questions
 
-  Version: 0.0.1
+  Version: 0.0.3.B
 
   Author: Event Espresso
   Author URI: http://www.eventespresso.com
@@ -27,7 +27,33 @@
 
  */
 register_activation_hook( __FILE__, array( 'EE_Price_Modifier', 'activate_price_modifier' ));
-add_action( 'plugins_loaded', array( 'EE_Price_Modifier', 'instance' ));		
+add_action( 'activated_plugin', array( 'EE_Price_Modifier', 'price_mod_plugin_activation_errors' ));
+add_action( 'plugins_loaded', array( 'EE_Price_Modifier', 'instance' ), 20 );	
+
+//Update notifications
+add_action('action_hook_espresso_epm_update_api', 'ee_epm_load_pue_update');
+function ee_epm_load_pue_update() {
+	global $org_options, $espresso_check_for_updates;
+	if ( $espresso_check_for_updates == false )
+		return;
+		
+	if (file_exists(EVENT_ESPRESSO_PLUGINFULLPATH . 'class/pue/pue-client.php')) { //include the file 
+		require(EVENT_ESPRESSO_PLUGINFULLPATH . 'class/pue/pue-client.php' );
+		$api_key = $org_options['site_license_key'];
+		$host_server_url = 'http://eventespresso.com';
+		$plugin_slug = 'espresso-price-modifier-pr';
+		$options = array(
+			'apikey' => $api_key,
+			'lang_domain' => 'event_espresso',
+			'checkPeriod' => '24',
+			'option_key' => 'site_license_key',
+      'options_page_slug' => 'event-espresso'
+		);
+		$check_for_updates = new PluginUpdateEngineChecker($host_server_url, $plugin_slug, $options); //initiate the class and start the plugin update engine!
+	}
+}
+
+	
 /**
  * ------------------------------------------------------------------------
  *
@@ -45,7 +71,7 @@ class EE_Price_Modifier {
 	private static $_instance = NULL;
 	
 	// price_mod version
-	private static $_version = '0.0.1';	
+	private static $_version = '0.0.3.B';	
 
 
 
@@ -80,20 +106,15 @@ class EE_Price_Modifier {
 
 		define( 'PRICE_MOD_DIR_PATH', plugin_dir_path( __FILE__ ) );
 		define( 'PRICE_MOD_DIR_URL', plugin_dir_url( __FILE__ ) );	
-
-//		if ( is_admin() ) {
-			//$this->_price_mod_admin();	
-			add_action( 'action_hook_espresso_generate_price_mod_form_inputs', array( $this, 'generate_price_mod_form_inputs' ), 10, 2 );
-			add_filter( 'filter_hook_espresso_form_question_response', array( $this, 'parse_question_response_for_price' ), 10, 3 );
-			add_filter( 'filter_hook_espresso_admin_question_response', array( $this, 'parse_admin_question_response_for_price' ), 10, 2 );
-			add_filter( 'filter_hook_espresso_parse_question_answer_for_price', array( $this, 'parse_question_answer_for_price' ), 10, 2 );
-			add_filter( 'filter_hook_espresso_question_cols_and_values', array( $this, 'insert_update_question_cols_and_values' ), 10, 2 );
-			
-//		} else {
-			//$this->_price_mod_frontend();
-			add_filter( 'filter_hook_espresso_form_question', array( $this, 'parse_form_question_for_price_mods' ), 10, 2 );
-			add_filter( 'filter_hook_espresso_question_formatted_value', array( $this, 'parse_form_value_for_price_mod' ), 10, 2 );
-//		}	
+		// admin hooks
+		add_action( 'action_hook_espresso_generate_price_mod_form_inputs', array( $this, 'generate_price_mod_form_inputs' ), 10, 2 );
+		add_filter( 'filter_hook_espresso_form_question_response', array( $this, 'parse_question_response_for_price' ), 10, 3 );
+		add_filter( 'filter_hook_espresso_admin_question_response', array( $this, 'parse_admin_question_response_for_price' ), 10, 2 );
+		add_filter( 'filter_hook_espresso_parse_question_answer_for_price', array( $this, 'parse_question_answer_for_price' ), 10, 2 );
+		add_filter( 'filter_hook_espresso_question_cols_and_values', array( $this, 'insert_update_question_cols_and_values' ), 10, 2 );
+		// frontend
+		add_filter( 'filter_hook_espresso_form_question', array( $this, 'parse_form_question_for_price_mods' ), 10, 2 );
+		add_filter( 'filter_hook_espresso_question_formatted_value', array( $this, 'parse_form_value_for_price_mod' ), 10, 2 );
 		
 	}
 
@@ -197,13 +218,40 @@ class EE_Price_Modifier {
 
 
 	/**
+	*	_process_price_mod_values
+	* 
+	*	@access 	public
+	*	@param 	string		$price_mod
+	*	@return 		array
+	*/	
+	private function _process_price_mod_values( $price_mod = FALSE ) {
+		if ( ! $price_mod ) {
+			return FALSE;
+		}
+		$values = explode( '|', $price_mod );
+		if ( isset( $values[1] )) {
+			$price = preg_replace('/-[^\.\d]/', '', $values[1]);
+		} else {
+			if ( is_numeric( $values[0] )) {
+				// prolly means somebody entered a comman for a thousands separator
+				return FALSE;
+			} 
+			$price = 0;
+		}
+		return array( 'mod' => $values[0], 'price' => $price );
+	}
+
+
+
+
+	/**
 	*	insert_update_question_cols_and_values
 	* 
-	*	@access 		public
-	*	@param 		array		$set_cols_and_values
+	*	@access 	public
+	*	@param 	array		$set_cols_and_values
 	*	@return 		string
 	*/	
-	public function insert_update_question_cols_and_values( $set_cols_and_values = FALSE, $enum_values = array() ) {
+	public function insert_update_question_cols_and_values( array $set_cols_and_values = NULL, $enum_values = array() ) {
 		if ( is_array( $set_cols_and_values )) {
 			$set_cols_and_values['price_mod'] = isset( $_POST['price_mod'] ) && isset( $enum_values[ $_POST['price_mod'] ] ) ?  $enum_values[ $_POST['price_mod'] ]  : 'N';
 			// if this IS a price modifier
@@ -212,17 +260,22 @@ class EE_Price_Modifier {
 				$response = array();
 				// split apart answer options
 				$price_mods = explode( ',', trim( $set_cols_and_values['response'], ',' ));
-				foreach ( $price_mods as $price_mod ) {
-					// now separate the option from the price
-					$price = explode( '|', $price_mod );
-					// do we have a price ?
-					if ( isset( $price[1] )) {
-						global $org_options;
-						//  strip out any currency signs 
-						$price[1] = str_replace( array( $org_options['currency_symbol'], '$' ), '', trim( $price[1] ));
-						// then put it back together
-						$response[] = trim( $price[0] ) . '|' . $price[1];
-					}					
+				foreach ( $price_mods as $key => $value ) {
+//					echo '<h4>$key : ' . $key . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';
+//					echo '<h4>$value : ' . $value . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';
+					// check if price mod was created and formatted correctly
+					// if there is NO pipe and the value is numeric, then somebody probably used a comma as a thousands separator
+					if ( strpos( $value, '|' ) === FALSE && is_numeric( $value )) {
+						$response[ $key - 1 ] .= $value;
+					} else {
+						// now separate the option from the price
+						if ( $values = $this->_process_price_mod_values( $value )) {
+//							printr( $values, '$values  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+							extract( $values );
+							// then put it back together
+							$response[ $key ] = trim( $mod ) . '|' . $price;
+						}						
+					}
 				}
 				// if we built a new reponse then stitch it back together and use it, or use the original response
 				$set_cols_and_values['response'] = !empty( $response ) ? implode( ',', $response ) : $set_cols_and_values['response'];
@@ -231,6 +284,8 @@ class EE_Price_Modifier {
 			$set_cols_and_values['price_mod_sold'] = isset( $_POST['price_mod_sold'] ) ? sanitize_text_field( $_POST['price_mod_sold'] )  : '';
 			add_filter( 'filter_hook_espresso_question_data_formats', array( $this, 'insert_update_question_data_formats' ), 10, 1 );
 		}
+//		printr( $response, '$response  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+//		die();
 		return $set_cols_and_values;	
 	}
 
@@ -241,11 +296,11 @@ class EE_Price_Modifier {
 	/**
 	*	insert__update_question_data_formats
 	* 
-	*	@access 		public
-	*	@param 		array		$data_formats
+	*	@access 	public
+	*	@param 	array		$data_formats
 	*	@return 		string
 	*/	
-	public function insert_update_question_data_formats( $data_formats = FALSE ) {
+	public function insert_update_question_data_formats( array $data_formats = NULL ) {
 		if ( is_array( $data_formats )) {
 			$data_formats[] = '%s';
 			$data_formats[] = '%s';
@@ -261,23 +316,24 @@ class EE_Price_Modifier {
 	/**
 	*	parse_admin_question_response_for_price
 	* 
-	*	@access 		public
-	*	@param 		array		$value
-	*	@param 		boolean	$price_mod
+	*	@access 	public
+	*	@param 	string		$value
+	*	@param 	boolean	$price_mod
 	*	@return 		string
 	*/	
 	public function parse_admin_question_response_for_price( $value = '', $price_mod = 'N' ) {
 		//->price_mod
 		if ( $price_mod == 'Y' ) {
 			global $org_options;
-			$values = explode( '|', $value );
-			$price = number_format( (float)$values[1], 2, '.', ',' );
-			if ( $price != 0 ) {
-				$plus_or_minus = $price > 0 ? '+' : '-';
-				$price_mod = $price > 0 ? $price : $price * (-1);
-				$value = $values[0] . '&nbsp;[&nbsp;' . $plus_or_minus . $org_options['currency_symbol'] . $price_mod . '&nbsp;]';					
-			} else {
-				$value = $values[0];	
+			if ( $values = $this->_process_price_mod_values( $value )) {
+				extract( $values );
+				if ( $price != 0 ) {
+					$plus_or_minus = $price > 0 ? '+' : '-';
+					$price_mod = $price > 0 ? $price : $price * (-1);
+					$value = $mod . '&nbsp;[&nbsp;' . $plus_or_minus . $org_options['currency_symbol'] . $price_mod . '&nbsp;]';					
+				} else {
+					$value = $mod;	
+				}
 			}
 		}
 		return $value;
@@ -290,10 +346,10 @@ class EE_Price_Modifier {
 	/**
 	*	parse_question_response_for_price
 	* 
-	*	@access 		public
-	*	@param 		array		$value
-	*	@param 		object		$question
-	*	@param 		int			$attendee_id
+	*	@access 	public
+	*	@param 	string		$value
+	*	@param 	object		$question
+	*	@param 	int			$attendee_id
 	*	@return 		string
 	*/	
 	public function parse_question_response_for_price( $value = '', $question = FALSE, $attendee_id = FALSE ) {
@@ -309,70 +365,72 @@ class EE_Price_Modifier {
 			$price_mod_qty = isset( $question->price_mod_qty ) ? $question->price_mod_qty : FALSE;
 			$price_mod_sold = isset( $question->price_mod_sold ) ? $question->price_mod_sold : '';
 
-			$values = explode( '|', $value );
+			if ( $values = $this->_process_price_mod_values( $value )) {
+				extract( $values );
 
-			$price = isset( $values[1] ) ? $values[1] : 0;
-
-			if ( $price != 0 ) {
-				
-				if ( ! $attendee_id ) {
-					echo __('An error occured. The ticket price could not be modified because an attendee id was not received.', 'event_espresso');
-					$success = FALSE;
-					return $value;
-				}
-				global $wpdb, $org_options;
-				
-				$plus_or_minus = $price > 0 ? '+' : '-';
-				$price_mod = $price > 0 ? $price : $price * (-1);
-				$value = $values[0] . '&nbsp;[&nbsp;' . $plus_or_minus . $org_options['currency_symbol'] . number_format( (float)$price_mod, 2, '.', ',' ) . '&nbsp;]';				
-
-				$SQL = 'UPDATE '. EVENTS_ATTENDEE_TABLE .' SET final_price = final_price ' . $plus_or_minus . ' %f where id = %d';	
-				if ( ! $wpdb->query( $wpdb->prepare( $SQL, $price, $attendee_id ))) {
-					$success = FALSE;
-				}
-				//echo '<h4>LQ : ' . $wpdb->last_query . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';		
-				
-				// now let's update any price mod qtys
-				if ( $price_mod_qty && $success ) {
-					$new_sold = array();
-					$sold_qty = 0;
-					// separate all $price_mod_qtys
-					$price_mod_sold = explode( ',', $price_mod_sold );
-					// cycle thru them
-					foreach ( $price_mod_sold as $key_sold ) {
-						// now separate the price mod key from the sold qty 
-						$sold = explode( '|', $key_sold );
-						// does the sold qty key match the key for the submitted value ?
-						if ( $sold[0] == $values[0] && ! empty( $sold[0] ) && isset( $sold[1] )) {
-							// first get qty from $values[0]
-							$qty_key = explode( ' ', trim( $sold[0] ));
-							$sold_qty = absint( $qty_key[0] );
-							// if so, then increment the amount sold
-							$qty = absint( $sold[1] ) + $sold_qty;
-							// then put it back together
-							$new_sold[] = $sold[0] . '|' . $qty;
-						} else {
-							$new_sold[] = $key_sold;
-						}
-					}
-					$new_sold = implode( ',', $new_sold );
-					$wpdb->update( 
-						EVENTS_QUESTION_TABLE,
-						array( 'price_mod_sold' => $new_sold ),
-						array( 'id' => $question->qstn_id ),
-						array( '%s' ),
-						array( '%d' )
-					);
+				if ( $price != 0 ) {
 					
-					$SQL = 'UPDATE '. EVENTS_QUESTION_TABLE .' QST SET price_mod_total = price_mod_total + %d where QST.id = %d';	
-					if ( ! $wpdb->query( $wpdb->prepare( $SQL, absint( $sold_qty ), $question->qstn_id ))) {
+					if ( ! $attendee_id ) {
+						echo __('An error occured. The ticket price could not be modified because an attendee id was not received.', 'event_espresso');
 						$success = FALSE;
-					}				
-				}
+						return $value;
+					}
+					global $wpdb, $org_options;
+					
+					$plus_or_minus = $price > 0 ? '+' : '-';
+					$price_mod = $price > 0 ? $price : $price * (-1);
+					$value = $mod . '&nbsp;[&nbsp;' . $plus_or_minus . $org_options['currency_symbol'] . number_format( (float)$price_mod, 2, '.', ',' ) . '&nbsp;]';				
 
-			} else {
-				$value = $values[0];
-				$success = FALSE;
+					$SQL = 'UPDATE '. EVENTS_ATTENDEE_TABLE .' SET final_price = final_price ' . $plus_or_minus . ' %f where id = %d';	
+					if ( ! $wpdb->query( $wpdb->prepare( $SQL, $price_mod, $attendee_id ))) {
+						$success = FALSE;
+					}
+					//echo '<h4>LQ : ' . $wpdb->last_query . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';		
+					
+					// now let's update any price mod qtys
+					if ( $price_mod_qty && $success ) {
+						$new_sold = array();
+						$sold_qty = 0;
+						// separate all $price_mod_qtys
+						$price_mod_sold = explode( ',', $price_mod_sold );
+						// cycle thru them
+						foreach ( $price_mod_sold as $key_sold ) {
+							// now separate the price mod key from the sold qty 
+							$sold = explode( '|', $key_sold );
+							// does the sold qty key match the key for the submitted value ?
+							if ( $sold[0] == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
+								// first get qty from $mod
+								$qty_key = explode( ' ', trim( $sold[0] ));
+								$sold_qty = absint( $qty_key[0] );
+								// remove non-digits from qty so that absint doesn't return 0'
+								$sold[1] = preg_replace( '/[^\d]/', '', $sold[1] );
+								// if so, then increment the amount sold
+								$qty = absint( $sold[1] ) + $sold_qty;
+								// then put it back together
+								$new_sold[] = $sold[0] . '|' . $qty;
+							} else {
+								$new_sold[] = $key_sold;
+							}
+						}
+						$new_sold = implode( ',', $new_sold );
+						$wpdb->update( 
+							EVENTS_QUESTION_TABLE,
+							array( 'price_mod_sold' => $new_sold ),
+							array( 'id' => $question->qstn_id ),
+							array( '%s' ),
+							array( '%d' )
+						);
+						
+						$SQL = 'UPDATE '. EVENTS_QUESTION_TABLE .' QST SET price_mod_total = price_mod_total + %d where QST.id = %d';	
+						if ( ! $wpdb->query( $wpdb->prepare( $SQL, absint( $sold_qty ), $question->qstn_id ))) {
+							$success = FALSE;
+						}				
+					}
+
+				} else {
+					$value = $mod;
+					$success = FALSE;
+				}		
 			}		
 		}
 		return $value;
@@ -385,23 +443,24 @@ class EE_Price_Modifier {
 	/**
 	*	parse_question_answer_for_price
 	* 
-	*	@access 		public
-	*	@param 		array		$value
-	*	@param 		boolean	$price_mod
+	*	@access 	public
+	*	@param 	string		$value
+	*	@param 	boolean	$price_mod
 	*	@return 		string
 	*/	
 	public function parse_question_answer_for_price( $value = '', $price_mod = 'N' ) {
 		if ( $price_mod == 'Y' ) {
-			global $org_options;
-			$values = explode( '|', $value );
-			$price = $values[1];
-			$plus_or_minus = $price > 0 ? '+' : '-';
-			$price_mod = $price > 0 ? $price : $price * (-1);
-			$find = array( '&#039;', "\xC2\xA0", "\x20", "&#160;", '&nbsp;' );
-			$replace = array( "'", ' ', ' ', ' ', ' '  );
-			$text = trim( stripslashes( str_replace( $find, $replace, $values[0] )));
-			$text = htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
-			$value =  $text . ' [ ' . $plus_or_minus . $org_options['currency_symbol'] . number_format( (float)$price_mod, 2, '.', ',' ) . ' ]';
+			if ( $values = $this->_process_price_mod_values( $value )) {
+				extract( $values );
+				global $org_options;
+				$plus_or_minus = $price > 0 ? '+' : '-';
+				$price_mod = $price > 0 ? $price : $price * (-1);
+				$find = array( '&#039;', "\xC2\xA0", "\x20", "&#160;", '&nbsp;' );
+				$replace = array( "'", ' ', ' ', ' ', ' '  );
+				$text = trim( stripslashes( str_replace( $find, $replace, $mod )));
+				$text = htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+				$value =  $text . ' [ ' . $plus_or_minus . $org_options['currency_symbol'] . number_format( (float)$price_mod, 2, '.', ',' ) . ' ]';
+			}
 		}
 		return $value;
 	}
@@ -413,8 +472,8 @@ class EE_Price_Modifier {
 	/**
 	*	parse_form_question_for_price_mods
 	* 
-	*	@access 		public
-	*	@param 		object		$question
+	*	@access 	public
+	*	@param 	object		$question
 	*	@return 		string
 	*/	
 	public function parse_form_question_for_price_mods( $question = FALSE ) {
@@ -432,12 +491,16 @@ class EE_Price_Modifier {
 				
 				// first we need to split all of the price mod variables into the separate items
 				$values = explode( ',', trim( $question->response, ',' ));
-				foreach ( $values as $price ) {
-					$price = explode( '|', $price );
-					if ( isset( $price[1] )) {
-						$items[ trim( $price[0] ) ] = array( 'price' => trim( $price[1] ));
-					} else {
-						$items[] = $price[0]; 
+				//printr( $values, '$values  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+				foreach ( $values as $value ) {
+					if ( $values = $this->_process_price_mod_values( $value )) {
+						//printr( $values, '$values  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+						extract( $values );
+						if ( $price != 0 ) {
+							$items[ trim( $mod ) ] = array( 'price' => trim( $price ));
+						} else {
+							$items[] = $mod; 
+						}
 					}
 				}
 				// now split up qtys and add to the items array
@@ -445,6 +508,8 @@ class EE_Price_Modifier {
 				foreach ( $qtys as $qty ) {
 					$qty = explode( '|', $qty );
 					if ( isset( $qty[1] )) {
+						// remove non-digits from qty so that absint doesn't return 0
+						$qty[1] = preg_replace( '/[^\d]/', '', $qty[1] );
 						$items[ trim( $qty[0] ) ]['qty'] = absint( trim( $qty[1] ));
 					}
 				}
@@ -453,6 +518,8 @@ class EE_Price_Modifier {
 				foreach ( $solds as $sold ) {
 					$sold = explode( '|', $sold );
 					if ( isset( $sold[1] )) {
+						// remove non-digits from qty so that absint doesn't return 0
+						$sold[1] = preg_replace( '/[^\d]/', '', $sold[1] );
 						$items[ trim( $sold[0] ) ]['sold'] = absint( trim( $sold[1] ));
 					}
 				}
@@ -495,24 +562,27 @@ class EE_Price_Modifier {
 	/**
 	*	parse_form_value_for_price_mod
 	* 
-	*	@access 		public
-	*	@param 		array		$value
-	*	@param 		object		$question
+	*	@access 	public
+	*	@param 	string		$value
+	*	@param 	object		$question
 	*	@return 		string
 	*/	
 	public function parse_form_value_for_price_mod ( $value = '', $question = FALSE ) {
-
+		// grab price mod status from question
 		$price_mod = isset( $question->price_mod ) ? $question->price_mod : 'N';
-
+		// is there a price mod ?
 		if ( $price_mod == 'Y' ) {
-			global $org_options;
-			$values = explode( '|', $value );
-			$add_or_sub = $values[1] > 0 ? __('add','event_espresso') : __('subtract','event_espresso');
-			$price_mod = $values[1] > 0 ? $values[1] : $values[1] * (-1);
-			if ( $values[1] != 0 ) {
-				$value = $values[0] . '<span>&nbsp;[&nbsp;' . $add_or_sub . '&nbsp;'  . $org_options['currency_symbol'] . $price_mod . '&nbsp;]</span>';
-			} else {
-				$value = $values[0];				
+			if ( $values = $this->_process_price_mod_values( $value )) {
+				extract( $values );
+				global $org_options;
+				if ( $price != 0 ) {
+					$add_or_sub = $price > 0 ? __('add','event_espresso') : __('subtract','event_espresso');
+					$price_mod = $price > 0 ? $price : $price * (-1);					
+					$price_mod = number_format( (float)$price_mod, 2, '.', ',' );
+					$value = $mod . '<span>&nbsp;[&nbsp;' . $add_or_sub . '&nbsp;'  . $org_options['currency_symbol'] . $price_mod . '&nbsp;]</span>';
+				} else {
+					$value = $mod;				
+				}
 			}
 		}
 		return $value;
@@ -525,7 +595,7 @@ class EE_Price_Modifier {
 	/**
 	*		activate EE_Price_Modifier
 	* 
-	*		@access 		public
+	*		@access 	public
 	*		@return 		void
 	*/	
 	public function activate_price_modifier() {
@@ -551,14 +621,28 @@ class EE_Price_Modifier {
 					KEY system_name (system_name),
 					KEY admin_only (admin_only)";
 			event_espresso_run_install( 'events_question', self::$_version, $sql );
-		}
-
 	}
 
+
+
+
+
+	/**
+	 * 		captures plugin activation errors for debugging
+	 *
+	 * 		@access public
+	 * 		@return void
+	 */
+	function price_mod_plugin_activation_errors() {
+		if ( WP_DEBUG === TRUE ) {
+			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_price_modifier_plugin_activation_errors.html', ob_get_contents() );
+		}	
+	}
+	
+	
+	
+	
 }
-
-
-
 // modified files in 3.1 core :
 // includes/admin-files/form-builder/questions/new_question.php
 // includes/form-builder/questions/edit_question.php
