@@ -113,13 +113,15 @@ class EE_Price_Modifier {
 		define( 'PRICE_MOD_DIR_URL', plugin_dir_url( __FILE__ ) );	
 		// admin hooks
 		add_action( 'action_hook_espresso_generate_price_mod_form_inputs', array( $this, 'generate_price_mod_form_inputs' ), 10, 2 );
-		add_filter( 'filter_hook_espresso_form_question_response', array( $this, 'parse_question_response_for_price' ), 10, 3 );
 		add_filter( 'filter_hook_espresso_admin_question_response', array( $this, 'parse_admin_question_response_for_price' ), 10, 2 );
 		add_filter( 'filter_hook_espresso_parse_question_answer_for_price', array( $this, 'parse_question_answer_for_price' ), 10, 2 );
 		add_filter( 'filter_hook_espresso_question_cols_and_values', array( $this, 'insert_update_question_cols_and_values' ), 10, 2 );
 		// frontend
 		add_filter( 'filter_hook_espresso_form_question', array( $this, 'parse_form_question_for_price_mods' ), 10, 2 );
 		add_filter( 'filter_hook_espresso_question_formatted_value', array( $this, 'parse_form_value_for_price_mod' ), 10, 2 );
+		add_filter( 'filter_hook_espresso_form_question_response', array( $this, 'parse_question_response_for_price' ), 10, 3 );
+		
+		add_filter( 'filter_hook_espresso_strip_price_mod', array( $this, 'strip_price_mod' ), 10, 1 );
 		
 	}
 
@@ -135,6 +137,31 @@ class EE_Price_Modifier {
 	*/		
 	public static function version() {
 		return self::$_version;
+	}
+
+
+
+
+
+
+	/**
+	*	strip_price_mod
+	* 
+	*	@access 	public
+	*	@param 	string		$value
+	*	@return 		string
+	*/	
+	public function strip_price_mod ( $value  = '' ) {
+		if ( is_array( $value )) {
+			$values = array();
+			foreach ( $value as $key => $val ) {
+				$values[ $key ] =  ! empty( $val ) ? array_shift( explode( ' [ ', $val )) : $val;
+			}
+			return $values;
+		} else {
+			$value = ! empty( $value ) ? array_shift( explode( ' [ ', $value )) : $value;
+			return $value;
+		}
 	}
 
 
@@ -528,9 +555,14 @@ class EE_Price_Modifier {
 						$items[ trim( $sold[0] ) ]['sold'] = absint( trim( $sold[1] ));
 					}
 				}
+//				if ( WP_DEBUG && current_user_can( 'update_core' )) {
+//					//printr( $items, '$items  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+//					//echo '<h3>$items</h3><pre style="height:auto;border:2px solid lightblue;">' . print_r( $items, TRUE ) . '</pre><br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>';
+//				}
 //				printr( $items, '$items  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
 //				$new_items = array();
 				foreach ( $items as $key => $item ) {
+					$item['price'] = isset( $item['price'] ) ? $item['price'] : 0;
 					// is there a max qty set for this item?
 					if ( isset( $item['qty'] )) {
 						// if so, how many are still available ?
