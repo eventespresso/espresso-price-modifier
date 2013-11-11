@@ -42,7 +42,10 @@ function ee_epm_load_pue_update() {
 		$api_key = $org_options['site_license_key'];
 		$host_server_url = 'http://eventespresso.com';
 		$plugin_slug = array(
-			'premium' => array('p' => 'espresso-price-modifier'),
+			// remove following line when releasing this version to stable
+			'premium' => array('b' => 'espresso-price-modifier-pr'),
+			// uncomment following line when releasing this version to stable
+			// 'premium' => array('p' => 'espresso-price-modifier'),
 			'prerelease' => array('b' => 'espresso-price-modifier-pr')
 			);
 		$options = array(
