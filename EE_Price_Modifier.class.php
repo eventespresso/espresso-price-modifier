@@ -4,7 +4,7 @@
   Plugin URI: http://eventespresso.com/
   Description: Modify the event fees that are charged by adding price modifiers to form questions
 
-  Version: 0.0.3.1.B
+  Version: 0.0.4.b
 
   Author: Event Espresso
   Author URI: http://www.eventespresso.com
@@ -41,13 +41,21 @@ function ee_epm_load_pue_update() {
 		require(EVENT_ESPRESSO_PLUGINFULLPATH . 'class/pue/pue-client.php' );
 		$api_key = $org_options['site_license_key'];
 		$host_server_url = 'http://eventespresso.com';
-		$plugin_slug = 'espresso-price-modifier-pr';
+		$plugin_slug = array(
+			// remove following line when releasing this version to stable
+			'premium' => array('b' => 'espresso-price-modifier-pr'),
+			// uncomment following line when releasing this version to stable
+			// 'premium' => array('p' => 'espresso-price-modifier'),
+			'prerelease' => array('b' => 'espresso-price-modifier-pr')
+			);
 		$options = array(
 			'apikey' => $api_key,
 			'lang_domain' => 'event_espresso',
 			'checkPeriod' => '24',
 			'option_key' => 'site_license_key',
-      'options_page_slug' => 'event-espresso'
+      		'options_page_slug' => 'event-espresso',
+      		'plugin_basename' => plugin_basename(__FILE__),
+			'use_wp_update' => FALSE, //if TRUE then you want FREE versions of the plugin to be updated from WP
 		);
 		$check_for_updates = new PluginUpdateEngineChecker($host_server_url, $plugin_slug, $options); //initiate the class and start the plugin update engine!
 	}
@@ -71,7 +79,7 @@ class EE_Price_Modifier {
 	private static $_instance = NULL;
 	
 	// price_mod version
-	private static $_version = '0.0.3.1.B';	
+	private static $_version = '0.0.4.b';	
 
 
 
