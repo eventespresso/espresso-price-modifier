@@ -638,7 +638,7 @@ class EE_Price_Modifier {
 	*		@access 	public
 	*		@return 		void
 	*/	
-	public function activate_price_modifier() {
+	public static function activate_price_modifier() {
 	
 		if ( file_exists( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' )) {
 			require_once( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' );		
@@ -674,7 +674,7 @@ class EE_Price_Modifier {
 	 * 		@access public
 	 * 		@return void
 	 */
-	function price_mod_plugin_activation_errors() {
+	public static function price_mod_plugin_activation_errors() {
 		if ( WP_DEBUG === TRUE ) {
 			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_price_modifier_plugin_activation_errors.html', ob_get_contents() );
 		}	
