@@ -406,14 +406,14 @@ class EE_Price_Modifier {
 							// now separate the price mod key from the sold qty 
 							$sold = explode( '|', $key_sold );
 							// does the sold qty key match the key for the submitted value ?
-							if ( $sold[0] == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
+							if ( trim($sold[0]) == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
 								// first get qty from $mod
-								$qty_key = explode( ' ', trim( $sold[0] ));
-								$sold_qty = absint( $qty_key[0] );
+								//$qty_key = explode( ' ', trim( $sold[0] )); 
+								$sold_qty++;
 								// remove non-digits from qty so that absint doesn't return 0'
 								$sold[1] = preg_replace( '/[^\d]/', '', $sold[1] );
 								// if so, then increment the amount sold
-								$qty = absint( $sold[1] ) + $sold_qty;
+								$qty = absint( $sold[1] ) + 1;
 								// then put it back together
 								$new_sold[] = $sold[0] . '|' . $qty;
 							} else {
