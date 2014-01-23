@@ -42,7 +42,10 @@ function ee_epm_load_pue_update() {
 		$api_key = $org_options['site_license_key'];
 		$host_server_url = 'http://eventespresso.com';
 		$plugin_slug = array(
-			'premium' => array('p' => 'espresso-price-modifier'),
+			// remove following line when releasing this version to stable
+			'premium' => array('b' => 'espresso-price-modifier-pr'),
+			// uncomment following line when releasing this version to stable
+			// 'premium' => array('p' => 'espresso-price-modifier'),
 			'prerelease' => array('b' => 'espresso-price-modifier-pr')
 			);
 		$options = array(
@@ -430,14 +433,14 @@ class EE_Price_Modifier {
 							// now separate the price mod key from the sold qty 
 							$sold = explode( '|', $key_sold );
 							// does the sold qty key match the key for the submitted value ?
-							if ( $sold[0] == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
+							if ( trim($sold[0]) == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
 								// first get qty from $mod
-								$qty_key = explode( ' ', trim( $sold[0] ));
-								$sold_qty = absint( $qty_key[0] );
+								//$qty_key = explode( ' ', trim( $sold[0] )); 
+								$sold_qty++;
 								// remove non-digits from qty so that absint doesn't return 0'
 								$sold[1] = preg_replace( '/[^\d]/', '', $sold[1] );
 								// if so, then increment the amount sold
-								$qty = absint( $sold[1] ) + $sold_qty;
+								$qty = absint( $sold[1] ) + 1;
 								// then put it back together
 								$new_sold[] = $sold[0] . '|' . $qty;
 							} else {
@@ -636,33 +639,29 @@ class EE_Price_Modifier {
 	*		@return 		void
 	*/	
 	public function activate_price_modifier() {
-
-		global $wpdb;
-		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-		$wp_table_name = $wpdb->prefix . 'events_question';
-
-		$SQL = "CREATE TABLE $wp_table_name ( 	
-			id int(11) unsigned NOT NULL auto_increment,
-			sequence INT(11) NOT NULL default '0',
-			question_type enum('TEXT','TEXTAREA','MULTIPLE','SINGLE','DROPDOWN') NOT NULL default 'TEXT',
-			question text NOT NULL,
-			system_name varchar(15) DEFAULT NULL,
-			response text NULL,
-			required ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
-			required_text text NULL,
-			price_mod ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
-			price_mod_qty text NULL,
-			price_mod_sold text NULL,
-			price_mod_total SMALLINT(6) NOT NULL DEFAULT '0',
-			admin_only ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
-			wp_user int(22) DEFAULT '1',
-			PRIMARY KEY  (id),
-			KEY wp_user (wp_user),
-			KEY system_name (system_name),
-			KEY admin_only (admin_only)
-		 	) DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;";			
-			dbDelta( $SQL );
-
+	
+		if ( file_exists( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' )) {
+			require_once( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' );		
+			$sql = "id int(11) unsigned NOT NULL auto_increment,
+					sequence INT(11) NOT NULL default '0',
+					question_type enum('TEXT','TEXTAREA','MULTIPLE','SINGLE','DROPDOWN') NOT NULL default 'TEXT',
+					question text NOT NULL,
+					system_name varchar(15) DEFAULT NULL,
+					response text NULL,
+					required ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
+					required_text text NULL,
+					price_mod ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
+					price_mod_qty text NULL,
+					price_mod_sold text NULL,
+					price_mod_total SMALLINT(6) NOT NULL DEFAULT '0',
+					admin_only ENUM( 'Y', 'N' ) NOT NULL DEFAULT 'N',
+					wp_user int(22) DEFAULT '1',
+					PRIMARY KEY  (id),
+					KEY wp_user (wp_user),
+					KEY system_name (system_name),
+					KEY admin_only (admin_only)";
+			event_espresso_run_install( 'events_question', self::$_version, $sql );
+		}
 	}
 
 
@@ -677,7 +676,7 @@ class EE_Price_Modifier {
 	 */
 	function price_mod_plugin_activation_errors() {
 		if ( WP_DEBUG === TRUE ) {
-			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_plugin_activation_errors.html', ob_get_contents() );
+			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_price_modifier_plugin_activation_errors.html', ob_get_contents() );
 		}	
 	}
 	
