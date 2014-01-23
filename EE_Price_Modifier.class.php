@@ -395,14 +395,15 @@ class EE_Price_Modifier {
 
 		if ( $price_mod == 'Y' ) {
 			
-			//printr( $question, '$question  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+			global $wpdb, $org_options;
 
 			$price_mod_qty = isset( $question->price_mod_qty ) ? $question->price_mod_qty : FALSE;
-			$price_mod_sold = isset( $question->price_mod_sold ) ? $question->price_mod_sold : '';
+			//$price_mod_sold = isset( $question->price_mod_sold ) ? $question->price_mod_sold : '';
+			$SQL = 'SELECT price_mod_sold FROM '. EVENTS_QUESTION_TABLE .' QST where QST.id = %d';
+			$price_mod_sold = $wpdb->get_var( $wpdb->prepare( $SQL, $question->qstn_id ));
 
 			if ( $values = $this->_process_price_mod_values( $value )) {
 				extract( $values );
-
 				if ( $price != 0 ) {
 					
 					if ( ! $attendee_id ) {
@@ -410,7 +411,6 @@ class EE_Price_Modifier {
 						$success = FALSE;
 						return $value;
 					}
-					global $wpdb, $org_options;
 					
 					$plus_or_minus = $price > 0 ? '+' : '-';
 					$price_mod = $price > 0 ? $price : $price * (-1);
@@ -460,6 +460,7 @@ class EE_Price_Modifier {
 						if ( ! $wpdb->query( $wpdb->prepare( $SQL, absint( $sold_qty ), $question->qstn_id ))) {
 							$success = FALSE;
 						}				
+						//echo '<h4>LQ : ' . $wpdb->last_query . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';		
 					}
 
 				} else {
