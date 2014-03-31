@@ -4,7 +4,7 @@
   Plugin URI: http://eventespresso.com/
   Description: Modify the event fees that are charged by adding price modifiers to form questions
 
-  Version: 0.0.4.b
+  Version: 0.0.5.b
 
   Author: Event Espresso
   Author URI: http://www.eventespresso.com
@@ -79,7 +79,7 @@ class EE_Price_Modifier {
 	private static $_instance = NULL;
 	
 	// price_mod version
-	private static $_version = '0.0.4.b';	
+	private static $_version = '0.0.5.b';	
 
 
 
