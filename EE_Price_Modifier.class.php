@@ -4,7 +4,7 @@
   Plugin URI: http://eventespresso.com/
   Description: Modify the event fees that are charged by adding price modifiers to form questions
 
-  Version: 0.0.4.b
+  Version: 0.0.5.b
 
   Author: Event Espresso
   Author URI: http://www.eventespresso.com
@@ -79,7 +79,7 @@ class EE_Price_Modifier {
 	private static $_instance = NULL;
 	
 	// price_mod version
-	private static $_version = '0.0.4.b';	
+	private static $_version = '0.0.5.b';	
 
 
 
@@ -116,13 +116,15 @@ class EE_Price_Modifier {
 		define( 'PRICE_MOD_DIR_URL', plugin_dir_url( __FILE__ ) );	
 		// admin hooks
 		add_action( 'action_hook_espresso_generate_price_mod_form_inputs', array( $this, 'generate_price_mod_form_inputs' ), 10, 2 );
-		add_filter( 'filter_hook_espresso_form_question_response', array( $this, 'parse_question_response_for_price' ), 10, 3 );
 		add_filter( 'filter_hook_espresso_admin_question_response', array( $this, 'parse_admin_question_response_for_price' ), 10, 2 );
 		add_filter( 'filter_hook_espresso_parse_question_answer_for_price', array( $this, 'parse_question_answer_for_price' ), 10, 2 );
 		add_filter( 'filter_hook_espresso_question_cols_and_values', array( $this, 'insert_update_question_cols_and_values' ), 10, 2 );
 		// frontend
 		add_filter( 'filter_hook_espresso_form_question', array( $this, 'parse_form_question_for_price_mods' ), 10, 2 );
 		add_filter( 'filter_hook_espresso_question_formatted_value', array( $this, 'parse_form_value_for_price_mod' ), 10, 2 );
+		add_filter( 'filter_hook_espresso_form_question_response', array( $this, 'parse_question_response_for_price' ), 10, 3 );
+		
+		add_filter( 'filter_hook_espresso_strip_price_mod', array( $this, 'strip_price_mod' ), 10, 1 );
 		
 	}
 
@@ -138,6 +140,31 @@ class EE_Price_Modifier {
 	*/		
 	public static function version() {
 		return self::$_version;
+	}
+
+
+
+
+
+
+	/**
+	*	strip_price_mod
+	* 
+	*	@access 	public
+	*	@param 	string		$value
+	*	@return 		string
+	*/	
+	public function strip_price_mod ( $value  = '' ) {
+		if ( is_array( $value )) {
+			$values = array();
+			foreach ( $value as $key => $val ) {
+				$values[ $key ] =  ! empty( $val ) ? array_shift( explode( ' [ ', $val )) : $val;
+			}
+			return $values;
+		} else {
+			$value = ! empty( $value ) ? array_shift( explode( ' [ ', $value )) : $value;
+			return $value;
+		}
 	}
 
 
@@ -368,14 +395,15 @@ class EE_Price_Modifier {
 
 		if ( $price_mod == 'Y' ) {
 			
-			//printr( $question, '$question  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+			global $wpdb, $org_options;
 
 			$price_mod_qty = isset( $question->price_mod_qty ) ? $question->price_mod_qty : FALSE;
-			$price_mod_sold = isset( $question->price_mod_sold ) ? $question->price_mod_sold : '';
+			//$price_mod_sold = isset( $question->price_mod_sold ) ? $question->price_mod_sold : '';
+			$SQL = 'SELECT price_mod_sold FROM '. EVENTS_QUESTION_TABLE .' QST where QST.id = %d';
+			$price_mod_sold = $wpdb->get_var( $wpdb->prepare( $SQL, $question->qstn_id ));
 
 			if ( $values = $this->_process_price_mod_values( $value )) {
 				extract( $values );
-
 				if ( $price != 0 ) {
 					
 					if ( ! $attendee_id ) {
@@ -383,7 +411,6 @@ class EE_Price_Modifier {
 						$success = FALSE;
 						return $value;
 					}
-					global $wpdb, $org_options;
 					
 					$plus_or_minus = $price > 0 ? '+' : '-';
 					$price_mod = $price > 0 ? $price : $price * (-1);
@@ -406,14 +433,14 @@ class EE_Price_Modifier {
 							// now separate the price mod key from the sold qty 
 							$sold = explode( '|', $key_sold );
 							// does the sold qty key match the key for the submitted value ?
-							if ( $sold[0] == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
+							if ( trim($sold[0]) == $mod && ! empty( $sold[0] ) && isset( $sold[1] )) {
 								// first get qty from $mod
-								$qty_key = explode( ' ', trim( $sold[0] ));
-								$sold_qty = absint( $qty_key[0] );
+								//$qty_key = explode( ' ', trim( $sold[0] )); 
+								$sold_qty++;
 								// remove non-digits from qty so that absint doesn't return 0'
 								$sold[1] = preg_replace( '/[^\d]/', '', $sold[1] );
 								// if so, then increment the amount sold
-								$qty = absint( $sold[1] ) + $sold_qty;
+								$qty = absint( $sold[1] ) + 1;
 								// then put it back together
 								$new_sold[] = $sold[0] . '|' . $qty;
 							} else {
@@ -433,6 +460,7 @@ class EE_Price_Modifier {
 						if ( ! $wpdb->query( $wpdb->prepare( $SQL, absint( $sold_qty ), $question->qstn_id ))) {
 							$success = FALSE;
 						}				
+						//echo '<h4>LQ : ' . $wpdb->last_query . '  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span></h4>';		
 					}
 
 				} else {
@@ -531,9 +559,14 @@ class EE_Price_Modifier {
 						$items[ trim( $sold[0] ) ]['sold'] = absint( trim( $sold[1] ));
 					}
 				}
+//				if ( WP_DEBUG && current_user_can( 'update_core' )) {
+//					//printr( $items, '$items  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
+//					//echo '<h3>$items</h3><pre style="height:auto;border:2px solid lightblue;">' . print_r( $items, TRUE ) . '</pre><br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>';
+//				}
 //				printr( $items, '$items  <br /><span style="font-size:10px;font-weight:normal;">' . __FILE__ . '<br />line no: ' . __LINE__ . '</span>', 'auto' );
 //				$new_items = array();
 				foreach ( $items as $key => $item ) {
+					$item['price'] = isset( $item['price'] ) ? $item['price'] : 0;
 					// is there a max qty set for this item?
 					if ( isset( $item['qty'] )) {
 						// if so, how many are still available ?
@@ -606,7 +639,7 @@ class EE_Price_Modifier {
 	*		@access 	public
 	*		@return 		void
 	*/	
-	public function activate_price_modifier() {
+	public static function activate_price_modifier() {
 	
 		if ( file_exists( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' )) {
 			require_once( EVENT_ESPRESSO_PLUGINFULLPATH . 'includes/functions/database_install.php' );		
@@ -642,7 +675,7 @@ class EE_Price_Modifier {
 	 * 		@access public
 	 * 		@return void
 	 */
-	function price_mod_plugin_activation_errors() {
+	public static function price_mod_plugin_activation_errors() {
 		if ( WP_DEBUG === TRUE ) {
 			file_put_contents( WP_CONTENT_DIR. '/uploads/espresso/logs/espresso_price_modifier_plugin_activation_errors.html', ob_get_contents() );
 		}	
