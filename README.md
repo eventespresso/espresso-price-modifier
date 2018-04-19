@@ -1,4 +1,4 @@
-## Addon_Name
+## Espresso Price Modifier
 
 This is an add-on for Event Espresso 3.1 (or legacy EE)
 https://eventespresso.com
